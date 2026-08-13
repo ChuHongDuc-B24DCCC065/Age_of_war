@@ -1,0 +1,18 @@
+# 1. Các file sinh ra khi Compile (Tránh nặng kho lưu trữ)
+*.o
+*.exe
+*.dll
+
+# 2. Thư mục cấu hình riêng của VS Code (Mỗi máy một khác, không nên đẩy lên)
+.vscode/
+
+# 3. File hệ thống thừa của Windows/macOS sinh ra
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 4. File dữ liệu người chơi (Game Save)
+*.sav
+*.json
+*.dat
+save_game.txt
