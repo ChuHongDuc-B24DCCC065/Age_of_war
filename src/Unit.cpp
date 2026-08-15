@@ -2,15 +2,12 @@
 
 Unit::Unit(float startX, float startY, Faction f) {
     x = startX;
-    y = startY; // y này ta quy ước là tọa độ mặt đất
+    y = startY; 
     faction = f;
     
-    // Trạng thái mặc định khi sinh ra
     state = UnitState::MOVING;
     currentCooldown = 0.0f;
     
-    // Các chỉ số (stats) sẽ được ghi đè ở class con (Warrior, Tank...)
-    // Ở đây ta gán tạm vài giá trị mặc định để tránh lỗi rác bộ nhớ
     width = 20.0f;
     height = 40.0f;
     hp = maxHp = 100;
@@ -23,156 +20,110 @@ void Unit::Update(float deltaTime, const std::vector<std::shared_ptr<Unit>>& uni
 
     if (currentCooldown > 0) currentCooldown -= deltaTime;
 
-    // 1. TÌM KIẾM TUYẾN TÍNH O(N): Xác định khoảng cách tới kẻ địch và đồng đội gần nhất
-    float minEnemyDist = 999999.0f; 
-    float minAllyDist = 999999.0f;
+    // 1. Quét tìm mục tiêu kẻ địch gần nhất (Bỏ qua hoàn toàn đồng minh để cho phép đi xuyên qua nhau)
+    float minEnemyDist = 999999.0f;
+    std::shared_ptr<Unit> targetEnemy = nullptr;
 
     for (const auto& other : units) {
-        if (other.get() == this || other->IsDead()) continue; // Bỏ qua chính mình và xác chết
+        if (other.get() == this || other->IsDead() || other->GetFaction() == this->faction) continue;
 
         float dist = 0.0f;
-        bool isInFront = false;
-
-        // Tính khoảng cách dựa trên hướng đi
         if (faction == Faction::PLAYER) {
-            dist = other->GetX() - this->x;
-            isInFront = (dist > 0); // Chỉ quan tâm mục tiêu phía trước
+            dist = other->GetX() - (this->x + this->width);
         } else {
-            dist = this->x - other->GetX();
-            isInFront = (dist > 0);
+            dist = this->x - (other->GetX() + other->GetWidth());
         }
 
-        if (isInFront) {
-            if (other->GetFaction() != this->faction) {
-                if (dist < minEnemyDist) minEnemyDist = dist; // Cập nhật kẻ địch gần nhất
-            } else {
-                if (dist < minAllyDist) minAllyDist = dist;   // Cập nhật đồng đội gần nhất
-            }
+        // Kẻ địch nằm phía trước hoặc đang chạm nhẹ (-10px bù trừ hitbox)
+        if (dist >= -10.0f && dist < minEnemyDist) {
+            minEnemyDist = dist;
+            targetEnemy = other;
         }
     }
 
-    // 2. TÍNH KHOẢNG CÁCH TỚI NHÀ CHÍNH ĐỊCH
+    // 2. Tính khoảng cách tới nhà chính đối phương
     float distToBase = 999999.0f;
     if (faction == Faction::PLAYER) {
-        distToBase = enemyBase.GetX() - this->x;
+        distToBase = enemyBase.GetX() - (this->x + this->width);
     } else {
-        // Phe địch đi sang trái, phải tính tới mép bên phải của nhà chính Player
-        distToBase = this->x - (playerBase.GetX() + playerBase.GetWidth()); 
+        distToBase = this->x - (playerBase.GetX() + playerBase.GetWidth());
     }
-    if (distToBase < minEnemyDist) minEnemyDist = distToBase;
 
-    // 3. QUẢN LÝ TRẠNG THÁI (STATE MACHINE)
-    float blockThreshold = width * 0.8f; // Nếu đồng đội đứng cách 80% bề ngang thân thì dừng lại
+    // 3. Quản lý trạng thái: Tấn công nếu có địch hoặc nhà chính trong tầm đánh
+    bool targetInRange = (minEnemyDist <= attackRange) || (distToBase <= attackRange);
 
-    if (minEnemyDist <= attackRange) {
+    if (targetInRange) {
         state = UnitState::ATTACKING;
-    } else if (minAllyDist <= blockThreshold) {
-        state = UnitState::MOVING; // Kẹt đồng đội -> Trạng thái vẫn là đi nhưng Lát nữa sẽ không cộng X
     } else {
         state = UnitState::MOVING;
     }
 
-    // 4. THỰC THI HÀNH ĐỘNG
-    if (state == UnitState::MOVING && minAllyDist > blockThreshold) {
+    // 4. Thực thi hành động
+    if (state == UnitState::MOVING) {
         if (faction == Faction::PLAYER) x += speed * deltaTime;
         else x -= speed * deltaTime;
-    }
+    } 
     else if (state == UnitState::ATTACKING) {
         if (currentCooldown <= 0) {
-            
-            // Xử lý Gây sát thương
-            if (distToBase <= attackRange) {
-                // Đánh nhà chính nếu vào tầm
+            // Ưu tiên đánh lính địch trước, nếu không có lính địch thì đánh nhà chính
+            if (minEnemyDist <= attackRange && targetEnemy != nullptr) {
+                targetEnemy->TakeDamage(damage);
+            } else if (distToBase <= attackRange) {
                 if (faction == Faction::PLAYER) enemyBase.TakeDamage(damage);
                 else playerBase.TakeDamage(damage);
-            } 
-            else {
-                // Quét tìm lính địch nằm trong tầm đánh để phang
-                for (auto& other : units) {
-                    if (other.get() == this || other->IsDead() || other->GetFaction() == this->faction) continue;
-                    
-                    float dist = 0.0f;
-                    if (faction == Faction::PLAYER) dist = other->GetX() - this->x;
-                    else dist = this->x - other->GetX();
-                    
-                    if (dist > 0 && dist <= attackRange) {
-                        other->TakeDamage(damage); // Đánh trúng đích!
-                        break; // Mỗi đòn chỉ trúng 1 mục tiêu đầu tiên
-                    }
-                }
             }
-            
-            // Reset thời gian chờ vung vũ khí
-            currentCooldown = attackCooldown; 
+
+            // Đặt lại thời gian hồi chiêu
+            currentCooldown = attackCooldown;
         }
     }
-
 }
 
 void Unit::Draw() {
     if (state == UnitState::DEAD) return;
     
-    // Vẽ thân Unit (Vẽ ngược từ mặt đất y lên trên)
     DrawRectangle(x, y - height, width, height, color);
 
-    // Vẽ thanh máu (Health Bar) cho lính
+    // Thanh máu
     float hpPercentage = (float)hp / maxHp;
-    DrawRectangle(x, y - height - 10, width, 5, RED); // Nền đỏ
-    DrawRectangle(x, y - height - 10, hpPercentage * width, 5, GREEN); // Máu xanh
+    DrawRectangle(x, y - height - 10, width, 5, RED);
+    DrawRectangle(x, y - height - 10, hpPercentage * width, 5, GREEN);
 
-    // 3. HIỆU ỨNG CHIẾN ĐẤU (VFX)
+    // Hiệu ứng tấn công (VFX)
     if (state == UnitState::ATTACKING) {
-        
-        // Thời gian chớp lóe của đòn đánh là 0.15 giây
         float animDuration = 0.15f; 
-        
-        // Nếu vừa mới tung đòn (Cooldown vừa bị reset về max và bắt đầu đếm ngược)
         if (currentCooldown > attackCooldown - animDuration) {
-            
-            // Tính toán vị trí cầm vũ khí (Mép trước của nhân vật)
             float weaponX = (faction == Faction::PLAYER) ? (x + width) : (x - 5.0f);
-            float weaponY = y - height / 2.0f; // Ở giữa thân
+            float weaponY = y - height / 2.0f;
 
-            // Phân loại: Tầm xa (Archer) hay Cận chiến
             if (attackRange > 50.0f) {
-                // LOGIC CỦA ARCHER: Vẽ mũi tên/viên đạn bay
-                
-                // Toán học: Tính % thời gian đạn bay (Từ 0.0 đến 1.0)
+                // Tầm xa (Archer)
                 float progress = (attackCooldown - currentCooldown) / animDuration; 
-                
-                // Quãng đường bay được = Tầm đánh * % thời gian
                 float distance = attackRange * progress; 
-                
                 float bulletX = (faction == Faction::PLAYER) ? (weaponX + distance) : (weaponX - distance);
-                
-                // Vẽ viên đạn (Hình tròn nhỏ màu vàng)
                 DrawCircle((int)bulletX, (int)weaponY, 4.0f, YELLOW);
-            } 
-            else {
-                // LOGIC CỦA WARRIOR/TANK: Vẽ tia chém ngang (Slash)
-                
-                float slashLength = 20.0f; // Độ vươn của tia chém
+            } else {
+                // Cận chiến (Warrior / Tank)
+                float slashLength = 20.0f; 
                 float endX = (faction == Faction::PLAYER) ? (weaponX + slashLength) : (weaponX - slashLength);
-                
-                // Vẽ tia chém dày 4 pixel
                 DrawLineEx({weaponX, weaponY}, {endX, weaponY}, 4.0f, YELLOW);
             }
         }
     }
 }
-void Unit::TakeDamage(int damageAmount){
+
+void Unit::TakeDamage(int damageAmount) {
     hp -= damageAmount;
-    if(hp <= 0){
+    if (hp <= 0) {
         state = UnitState::DEAD;
     }
 }
+
 bool Unit::IsDead() const {
     return state == UnitState::DEAD;
 }
 
 float Unit::GetX() const { return x; }
+float Unit::GetWidth() const { return width; }
 Faction Unit::GetFaction() const { return faction; }
-
-int Unit::GetCost() const{
-    return cost;
-}
+int Unit::GetCost() const { return cost; }

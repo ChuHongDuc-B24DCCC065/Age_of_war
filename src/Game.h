@@ -10,6 +10,10 @@ enum class GameState { PLAYING, GAME_OVER};
 
 class Game {
 private:
+
+const int MAX_UNITS = 6;
+int CountUnits(Faction faction) const;
+
     Base playerBase;
     Base enemyBase;
     std::vector<std::shared_ptr<Unit>> activeUnits;
@@ -22,6 +26,12 @@ private:
     Button btnArcher;
     Button btnTank;
 
+    Texture2D background;
+    Texture2D warriorTex;
+    Texture2D archerTex; 
+    Texture2D tankTex;
+    Texture2D baseTex;
+
     GameState currentState;
     int winner;
     Button btnRestart;
@@ -30,6 +40,7 @@ private:
 
 public:
     Game(); 
+    ~Game();
     
     void Update();
     void Draw(); // Dòng này lúc nãy bạn vô tình làm mất

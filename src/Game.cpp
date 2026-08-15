@@ -4,14 +4,27 @@
 #include "Tank.h"
 #include <algorithm>
 Game::Game() 
-    : playerBase(50, 530, BLUE), enemyBase(870, 530, RED),
+    : 
       // Xếp 3 nút nằm ngang nhau ở góc trên bên trái
       btnWarrior(20, 60, 160, 40, "Warrior ($50)", SKYBLUE),
       btnArcher(200, 60, 160, 40, "Archer ($75)", ORANGE),
       btnTank(380, 60, 160, 40, "Tank ($150)", MAROON),
       btnRestart(400, 400, 200, 50, "PLAY AGAIN", LIGHTGRAY)
 {
+    background = LoadTexture("assets/thoikidoda.png");
+    warriorTex = LoadTexture("assets/chienbinh.png");
+    archerTex = LoadTexture("assets/cungthu.png"); 
+    tankTex = LoadTexture("assets/tank.png");
+    baseTex = LoadTexture("assets/nha.png");
     ResetGame();
+
+}
+Game::~Game() {
+    UnloadTexture(background);
+    UnloadTexture(warriorTex);
+    UnloadTexture(archerTex); 
+    UnloadTexture(tankTex);
+    UnloadTexture(baseTex);
 }
 void Game::ResetGame() {
     activeUnits.clear(); // Thuật toán tự động giải phóng toàn bộ RAM của lính cũ
@@ -19,38 +32,47 @@ void Game::ResetGame() {
     goldIncreaseRate = 15.0f;
     
     // Gán lại nhà chính mới (Máu đầy)
-    playerBase = Base(50, 530, BLUE);
-    enemyBase = Base(870, 530, RED);
+    playerBase = Base(50, 530, baseTex, true);   
+    enemyBase = Base(870, 530, baseTex, false);
     
     enemyAI = EnemyAI(); // Đặt lại AI kẻ thù
     
     currentState = GameState::PLAYING;
     winner = 0;
 }
+int Game::CountUnits(Faction faction) const {
+    int count = 0;
+    for (const auto& unit : activeUnits) {
+        if (unit->GetFaction() == faction && !unit->IsDead()) {
+            count++;
+        }
+    }
+    return count;
+}
 void Game::SpawnUnit(Faction faction, UnitType type) {
-    // Vị trí đẻ lính (Ngay trước nhà chính)
-    float spawnX = (faction == Faction::PLAYER) ? 100.0f : 850.0f;
-    float spawnY = 650.0f; // Mặt đất
+    if (CountUnits(faction) >= MAX_UNITS) {
+        return; 
+    }
 
-    std::shared_ptr<Unit> newUnit=nullptr;
-    // Tạo lính dựa trên loại yêu cầu
+    float spawnX = (faction == Faction::PLAYER) ? 100.0f : 850.0f;
+    float spawnY = 650.0f; 
+
+    std::shared_ptr<Unit> newUnit = nullptr;
     if (type == UnitType::WARRIOR) {
-        newUnit = std::make_shared<Warrior>(spawnX, spawnY, faction);
+        newUnit = std::make_shared<Warrior>(spawnX, spawnY, faction, warriorTex);
     } else if (type == UnitType::ARCHER) {
-        newUnit = std::make_shared<Archer>(spawnX, spawnY, faction);
+        newUnit = std::make_shared<Archer>(spawnX, spawnY, faction, archerTex);
     } else if (type == UnitType::TANK) {
-        newUnit = std::make_shared<Tank>(spawnX, spawnY, faction);
+        newUnit = std::make_shared<Tank>(spawnX, spawnY, faction, tankTex);
     }
 
     if (newUnit != nullptr) {
         if (faction == Faction::PLAYER) {
-            // Kiểm tra xem có đủ tiền không
             if (playerGold >= newUnit->GetCost()) {
-                playerGold -= newUnit->GetCost(); // Trừ tiền
-                activeUnits.push_back(newUnit);   // Đẩy lính ra trận
+                playerGold -= newUnit->GetCost();
+                activeUnits.push_back(newUnit);
             }
         } else {
-            // Tạm thời phe Địch đẻ lính không tốn tiền (AI sẽ xử lý vụ tiền của địch sau)
             activeUnits.push_back(newUnit);
         }
     }
@@ -96,6 +118,14 @@ void Game::Update() {
     for (auto& unit : activeUnits) {
         unit->Update(deltaTime, activeUnits, playerBase, enemyBase);
     }
+    for (const auto& unit : activeUnits) {
+        if (unit->IsDead()) {
+            // Nếu lính bị tiêu diệt thuộc phe địch -> thưởng vàng cho người chơi
+            if (unit->GetFaction() == Faction::ENEMY) {
+                playerGold += unit->GetCost() * 0.8f; // Thưởng 80% giá trị lính
+            }
+        }
+    }
 
     // Dọn rác (Giữ nguyên)
     activeUnits.erase(
@@ -115,27 +145,34 @@ void Game::Update() {
 
 void Game::Draw() {
     ClearBackground(RAYWHITE);
-    DrawRectangle(0, 650, 1000, 150, LIGHTGRAY); 
+
+    // 1. Ép ảnh nền co giãn vừa khít toàn bộ màn hình 1000x800
+    Rectangle sourceRec = { 0.0f, 0.0f, (float)background.width, (float)background.height };
+    Rectangle destRec   = { 0.0f, 0.0f, 1000.0f, 800.0f }; // Kích thước cửa sổ
+    DrawTexturePro(background, sourceRec, destRec, { 0, 0 }, 0.0f, WHITE);
+
+    // 2. XÓA HOẶC COMMENT DÒNG NÀY ĐỂ BỎ KHỐI ĐẤT XÁM:
+    // DrawRectangle(0, 650, 1000, 150, LIGHTGRAY); 
+
+    // 3. Vẽ nhà chính và lính (sẽ đứng trực tiếp lên thảm cỏ của ảnh nền)
     playerBase.Draw();
     enemyBase.Draw();
     for (auto& unit : activeUnits) {
         unit->Draw();
     }
-    DrawText(TextFormat("GOLD: %d", (int)playerGold), 20, 20, 30, ORANGE);
+
+    // 4. Vẽ thanh UI bán trong suốt ở trên cùng
+    DrawRectangle(0, 0, 1000, 120, { 0, 0, 0, 150 });
+    DrawText(TextFormat("GOLD: %d", (int)playerGold), 20, 20, 30, YELLOW);
+DrawText(TextFormat("UNITS: %d/%d", CountUnits(Faction::PLAYER), MAX_UNITS), 220, 20, 30, SKYBLUE);
     btnWarrior.Draw(playerGold >= 50);
     btnArcher.Draw(playerGold >= 75);
     btnTank.Draw(playerGold >= 150);
 
     if (currentState == GameState::GAME_OVER) {
-        // Vẽ hình chữ nhật đen mờ (Alpha 150/255) đè lên cả màn hình
         DrawRectangle(0, 0, 1000, 800, { 0, 0, 0, 150 });
-        
-        if (winner == 1) {
-            DrawText("VICTORY!", 380, 300, 50, GREEN);
-        } else {
-            DrawText("DEFEAT!", 400, 300, 50, RED);
-        }
-        
-        btnRestart.Draw(true); // Vẽ nút Play Again (luôn đủ điều kiện bấm = true)
+        if (winner == 1) DrawText("VICTORY!", 380, 300, 50, GREEN);
+        else DrawText("DEFEAT!", 400, 300, 50, RED);
+        btnRestart.Draw(true);
     }
 }

@@ -20,24 +20,39 @@ bool Button::IsClicked() const {
 }
 
 void Button::Draw(bool affordable) const {
+    // 1. Lấy vị trí chuột hiện tại
     Vector2 mousePoint = GetMousePosition();
+    
+    // 2. Kiểm tra xem chuột có nằm trong khu vực của Nút không
     bool isHovered = CheckCollisionPointRec(mousePoint, bounds);
 
-    Color bgColor = baseColor;
-    
+    Color bgColor;
+    Color textColor;
+
+    // 3. Xử lý màu sắc dựa trên việc có đủ tiền (affordable) hay không
     if (!affordable) {
-        bgColor = GRAY; // Không đủ tiền -> Màu xám
-    } 
-    else if (isHovered) {
-        bgColor = LIGHTGRAY; // Đủ tiền + Chuột lướt qua -> Sáng lên
+        // Trạng thái KHÔNG đủ tiền: Nền tối, chữ đỏ cảnh báo, không có hiệu ứng hover
+        bgColor = DARKGRAY;
+        textColor = RED;
+    } else {
+        // Trạng thái ĐỦ tiền: Nếu di chuột vào thì sáng lên (LIGHTGRAY), không thì dùng màu gốc (baseColor)
+        bgColor = isHovered ? LIGHTGRAY : baseColor;
+        textColor = isHovered ? BLACK : WHITE;
     }
 
-    // Vẽ hình chữ nhật nền
-    DrawRectangleRec(bounds, bgColor);
-    // Vẽ viền đen cho đẹp
-    DrawRectangleLinesEx(bounds, 2.0f, BLACK);
+    // 4. Vẽ nút bo góc
+    DrawRectangleRounded(bounds, 0.2f, 10, bgColor);
     
-    // Đoạn code căn giữa chữ vào giữa nút bấm
-    int textWidth = MeasureText(text.c_str(), 20); // Đo xem chuỗi chữ dài bao nhiêu pixel
-    DrawText(text.c_str(), bounds.x + bounds.width/2 - textWidth/2, bounds.y + bounds.height/2 - 10, 20, BLACK);
+    // 5. Vẽ viền cho nút (Đã thêm số 2 vào trước BLACK, đây là độ dày của viền)
+    DrawRectangleRoundedLines(bounds, 0.2f, 10, BLACK);
+
+    // 6. Tính toán kích thước chữ để Căn giữa
+    int fontSize = 20;
+    int textWidth = MeasureText(text.c_str(), fontSize);
+    
+    int textX = bounds.x + (bounds.width / 2) - (textWidth / 2);
+    int textY = bounds.y + (bounds.height / 2) - (fontSize / 2);
+
+    // 7. In chữ lên nút
+    DrawText(text.c_str(), textX, textY, fontSize, textColor);
 }

@@ -26,6 +26,7 @@ protected:
     float attackCooldown;
     float currentCooldown;
     int cost;
+    float GetWidth() const;
     Faction faction;
     UnitState state;
     Color color;
