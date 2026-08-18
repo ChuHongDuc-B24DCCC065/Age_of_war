@@ -2,6 +2,7 @@
 
 Tank::Tank(float startX, float startY, Faction faction, Texture2D tex) 
     : Unit(startX, startY, faction) {
+        unitType = UnitType::TANK;
     
     this->texture = tex; 
 
@@ -9,7 +10,7 @@ Tank::Tank(float startX, float startY, Faction faction, Texture2D tex)
     hp = maxHp = 300;
     damage = 40;
     attackRange = 200.0f;
-    attackCooldown = 2.0f;
+    attackCooldown = 1.5f;
     speed = 25.0f;
     cost = 150;
     
@@ -18,20 +19,10 @@ Tank::Tank(float startX, float startY, Faction faction, Texture2D tex)
 }
 
 void Tank::Draw() {
-    // 1. Vẽ ảnh lật chiều
-    float flip = (faction == Faction::PLAYER) ? 1.0f : -1.0f;
-    Rectangle sourceRec = { 0.0f, 0.0f, (float)texture.width * flip, (float)texture.height };
-    Vector2 position = { x, y };
-    DrawTextureRec(texture, sourceRec, position, WHITE);
+    Rectangle sourceRec = { 0.0f, 0.0f, (float)texture.width * (faction == Faction::PLAYER ? 1.0f : -1.0f), (float)texture.height };
+    Rectangle destRec   = { x, y, 90.0f, 90.0f };
+    Vector2 origin      = { 45.0f, 90.0f }; 
+    DrawTexturePro(texture, sourceRec, destRec, origin, 0.0f, WHITE);
 
-    // 2. Vẽ thanh máu
-    float healthPercentage = (float)hp / maxHp;
-    int barWidth = 40;  
-    int barHeight = 6;  
-    int barX = (int)x + (texture.width / 2) - (barWidth / 2);
-    int barY = (int)y - 10;
-    
-    DrawRectangle(barX - 1, barY - 1, barWidth + 2, barHeight + 2, BLACK);
-    DrawRectangle(barX, barY, barWidth, barHeight, RED);
-    DrawRectangle(barX, barY, barWidth * healthPercentage, barHeight, GREEN);
+    DrawHealthBar();
 }

@@ -1,58 +1,49 @@
 #include "Button.h"
 
-Button::Button(float x, float y, float width, float height, std::string text, Color color) {
-    bounds = {x, y, width, height};
-    this->text = text;
-    baseColor = color;
+Button::Button() 
+    : rect(Rectangle{ 0.0f, 0.0f, 0.0f, 0.0f }), text(""), baseColor(GRAY), isEnabled(true) {}
+
+Button::Button(float x, float y, float width, float height, const char* label, Color color)
+    : rect(Rectangle{ x, y, width, height }), text(label), baseColor(color), isEnabled(true) {}
+
+void Button::SetText(const char* newText) {
+    text = newText;
+}
+
+void Button::SetRect(Rectangle newRect) {
+    rect = newRect;
 }
 
 bool Button::IsClicked() const {
-    Vector2 mousePoint = GetMousePosition(); // Lấy tọa độ chuột
-    
-    // Thuật toán kiểm tra: Chuột có nằm trong Hình chữ nhật không?
-    if (CheckCollisionPointRec(mousePoint, bounds)) {
-        // Có đang bấm chuột trái không?
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            return true;
-        }
-    }
-    return false;
+    if (!isEnabled) return false;
+    Vector2 mousePos = GetMousePosition();
+    return CheckCollisionPointRec(mousePos, rect) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
-void Button::Draw(bool affordable) const {
-    // 1. Lấy vị trí chuột hiện tại
-    Vector2 mousePoint = GetMousePosition();
-    
-    // 2. Kiểm tra xem chuột có nằm trong khu vực của Nút không
-    bool isHovered = CheckCollisionPointRec(mousePoint, bounds);
+void Button::Draw(bool enabled) {
+    isEnabled = enabled;
+    Vector2 mousePos = GetMousePosition();
+    bool isHovered = CheckCollisionPointRec(mousePos, rect) && isEnabled;
 
-    Color bgColor;
-    Color textColor;
+    // 1. Màu sắc theo trạng thái
+    Color bodyColor = isEnabled ? (isHovered ? ColorAlpha(baseColor, 0.9f) : baseColor) : Color{ 30, 41, 59, 180 };
+    Color borderColor = isEnabled ? (isHovered ? RAYWHITE : ColorAlpha(WHITE, 0.3f)) : Color{ 71, 85, 105, 100 };
+    Color textColor = isEnabled ? RAYWHITE : Color{ 148, 163, 184, 150 };
 
-    // 3. Xử lý màu sắc dựa trên việc có đủ tiền (affordable) hay không
-    if (!affordable) {
-        // Trạng thái KHÔNG đủ tiền: Nền tối, chữ đỏ cảnh báo, không có hiệu ứng hover
-        bgColor = DARKGRAY;
-        textColor = RED;
-    } else {
-        // Trạng thái ĐỦ tiền: Nếu di chuột vào thì sáng lên (LIGHTGRAY), không thì dùng màu gốc (baseColor)
-        bgColor = isHovered ? LIGHTGRAY : baseColor;
-        textColor = isHovered ? BLACK : WHITE;
+    // 2. Vẽ nền nút và viền
+    DrawRectangleRounded(rect, 0.2f, 4, bodyColor);
+    DrawRectangleRoundedLines(rect, 0.2f, 4, borderColor);
+
+    // 3. Canh giữa text
+    const char* str = text.c_str();
+    int fontSize = 12;
+    int textWidth = MeasureText(str, fontSize);
+    int textX = (int)(rect.x + (rect.width - textWidth) / 2.0f);
+    int textY = (int)(rect.y + (rect.height - fontSize) / 2.0f);
+
+    // 4. Đổ bóng chữ
+    if (isEnabled) {
+        DrawText(str, textX + 1, textY + 1, fontSize, ColorAlpha(BLACK, 0.6f));
     }
-
-    // 4. Vẽ nút bo góc
-    DrawRectangleRounded(bounds, 0.2f, 10, bgColor);
-    
-    // 5. Vẽ viền cho nút (Đã thêm số 2 vào trước BLACK, đây là độ dày của viền)
-    DrawRectangleRoundedLines(bounds, 0.2f, 10, BLACK);
-
-    // 6. Tính toán kích thước chữ để Căn giữa
-    int fontSize = 20;
-    int textWidth = MeasureText(text.c_str(), fontSize);
-    
-    int textX = bounds.x + (bounds.width / 2) - (textWidth / 2);
-    int textY = bounds.y + (bounds.height / 2) - (fontSize / 2);
-
-    // 7. In chữ lên nút
-    DrawText(text.c_str(), textX, textY, fontSize, textColor);
+    DrawText(str, textX, textY, fontSize, textColor);
 }

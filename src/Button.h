@@ -4,13 +4,17 @@
 
 class Button {
 private:
-    Rectangle bounds; // Chứa x, y, width, height
+    Rectangle rect;
     std::string text;
     Color baseColor;
+    bool isEnabled;
 
 public:
-    Button(float x, float y, float width, float height, std::string text, Color color);
-    
+    Button();
+    Button(float x, float y, float width, float height, const char* label, Color color);
+
+    void SetText(const char* newText);
+    void SetRect(Rectangle newRect);
     bool IsClicked() const;
-    void Draw(bool affordable) const; // Truyền vào true/false xem có đủ tiền mua không
+    void Draw(bool enabled);
 };
