@@ -19,7 +19,9 @@ Một tựa game chiến thuật thủ thành lấy cảm hứng từ huyền th
 
 ## 🚀 Cách tải và cài đặt
 
-1. Tải về file nén `AgeOfWar_Release.zip`.
+**[⬇️ BẤM VÀO ĐÂY ĐỂ TẢI GAME VỀ MÁY ⬇️](https://github.com/ChuHongDuc-B24DCCC065/Age_of_war/releases/latest/download/AgeOfWar_Release.zip)**
+
+1. Nhấp vào đường link bên trên để tự động tải về file nén `AgeOfWar_Release.zip`.
 2. Giải nén toàn bộ thư mục ra máy tính của bạn.
 3. Chạy file **`game.exe`** để bắt đầu chơi.
 
