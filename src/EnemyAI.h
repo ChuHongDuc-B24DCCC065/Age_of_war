@@ -10,9 +10,14 @@ private:
 public:
     EnemyAI();
     
+    int currentWave;
+    int unitsToSpawnThisWave;
+    float waveTimer;
+    bool isBossWave;
+    float timeBetweenWaves;
+
     void Update(float deltaTime);
     
-    // Tham chiếu &outType giúp hàm "tuồn" dữ liệu loại lính ra ngoài
     bool DecideSpawn(UnitType& outType); 
     
     void OnUnitSpawned(int cost);

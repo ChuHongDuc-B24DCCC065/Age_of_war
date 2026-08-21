@@ -15,6 +15,7 @@ public:
 
     void SetText(const char* newText);
     void SetRect(Rectangle newRect);
+    bool IsHovered() const;
     bool IsClicked() const;
     void Draw(bool enabled);
 };

@@ -2,20 +2,27 @@
 #include <algorithm>
 #include <cmath>
 Game::Game() 
-    : btnWarrior(10, 48, 125, 38, "Warrior ($50)", Color{ 37, 99, 235, 255 }),      // Xanh Royal
-      btnArcher(140, 48, 125, 38, "Archer ($75)", Color{ 217, 119, 6, 255 }),       // Amber Gold
-      btnTank(270, 48, 130, 38, "Tank ($150)", Color{ 185, 28, 28, 255 }),          // Crimson Red
-      btnTurret(410, 48, 135, 38, "Turret ($120)", Color{ 13, 148, 136, 255 }),    // Teal
-      btnBuyExp(555, 48, 130, 38, "+EXP ($50)", Color{ 16, 185, 129, 255 }),        // Emerald
-      btnSpecial(695, 48, 140, 38, "METEOR (-150)", Color{ 225, 29, 72, 255 }),     // Rose Red
-      btnEvolve(845, 48, 145, 38, "EVOLVE (400)", Color{ 126, 34, 206, 255 }),     // Purple
-      btnRestart(400, 380, 200, 45, "PLAY AGAIN", Color{ 37, 99, 235, 255 })
+    : btnWarrior(10, 48, 125, 38, "Chien binh ($50)", Color{ 37, 99, 235, 255 }),      // Xanh Royal
+      btnArcher(140, 48, 125, 38, "Cung thu ($75)", Color{ 217, 119, 6, 255 }),       // Amber Gold
+      btnTank(270, 48, 130, 38, "Xe tang ($150)", Color{ 185, 28, 28, 255 }),          // Crimson Red
+      btnTurret(410, 48, 135, 38, "Thap canh ($120)", Color{ 13, 148, 136, 255 }),    // Teal
+      btnBuyExp(555, 48, 130, 38, "+KN ($50)", Color{ 16, 185, 129, 255 }),        // Emerald
+      btnSpecial(695, 48, 140, 38, "THIEN THACH (-150)", Color{ 225, 29, 72, 255 }),     // Rose Red
+      btnEvolve(845, 48, 145, 38, "TIEN HOA (400)", Color{ 126, 34, 206, 255 }),     // Purple
+      btnRestart(400, 380, 200, 45, "CHOI LAI", Color{ 37, 99, 235, 255 }),
+      btnAutoSpawn(845, 88, 145, 25, "Tu dong: TAT", Color{ 100, 100, 100, 255 }),
+      btnUpgWarrior(10, 88, 125, 22, "Nang cap CB ($100)", Color{ 30, 41, 59, 255 }),
+      btnUpgArcher(140, 88, 125, 22, "Nang cap CT ($150)", Color{ 30, 41, 59, 255 }),
+      btnUpgTank(270, 88, 130, 22, "Nang cap XT ($300)", Color{ 30, 41, 59, 255 })
 {
     background = LoadTexture("assets/thoikidoda.png");
     warriorTex = LoadTexture("assets/chienbinh.png");
     archerTex  = LoadTexture("assets/cungthu.png"); 
     tankTex    = LoadTexture("assets/tank.png");
     baseTex    = LoadTexture("assets/nha.png");
+    
+    sfxClash = LoadSound("assets/clash.wav");
+    sfxWhoosh = LoadSound("assets/whoosh.wav");
     
     ResetGame();
 }
@@ -26,6 +33,8 @@ Game::~Game() {
     UnloadTexture(archerTex); 
     UnloadTexture(tankTex);
     UnloadTexture(baseTex);
+    UnloadSound(sfxClash);
+    UnloadSound(sfxWhoosh);
 }
 
 void Game::ResetGame() {
@@ -48,11 +57,25 @@ void Game::ResetGame() {
     
     playerBase = Base(10, 530, baseTex, true);   
     enemyBase  = Base(790, 530, baseTex, false);
-    btnTurret.SetText("Turret ($120) [0/3]");
+    btnTurret.SetText("Thap canh ($120) [0/3]");
     
     enemyAI = EnemyAI();
     currentState = GameState::PLAYING;
     winner = 0;
+    
+    warriorLvl = 1;
+    archerLvl = 1;
+    tankLvl = 1;
+    btnUpgWarrior.SetText("Nang cap CB ($100)");
+    btnUpgArcher.SetText("Nang cap CT ($150)");
+    btnUpgTank.SetText("Nang cap XT ($300)");
+
+    playerWall.x = 220.0f;
+    playerWall.maxHp = 1000;
+    playerWall.hp = 1000;
+    playerWall.level = 1;
+    playerWall.active = true;
+    btnHealWall.SetText("Sua tuong ($100)");
 }
 
 float Game::GetAgeMultiplier(Age age) const {
@@ -62,9 +85,9 @@ float Game::GetAgeMultiplier(Age age) const {
 }
 
 const char* Game::GetAgeName(Age age) const {
-    if (age == Age::STONE_AGE)    return "AGE I (STONE)";
-    if (age == Age::MEDIEVAL_AGE) return "AGE II (MEDIEVAL)";
-    return "AGE III (MODERN)";
+    if (age == Age::STONE_AGE)    return "THOI KY DO DA";
+    if (age == Age::MEDIEVAL_AGE) return "THOI KY TRUNG CO";
+    return "THOI KY HIEN DAI";
 }
 int Game::CountUnits(Faction faction) const {
     int count = 0;
@@ -85,19 +108,30 @@ void Game::SpawnUnit(Faction faction, UnitType type) {
     float spawnY = 650.0f; 
 
     // Khai báo hệ số nhân sức mạnh dựa theo thời đại của từng phe
-    float multiplier = GetAgeMultiplier(faction == Faction::PLAYER ? currentAge : enemyAge);
+    float ageMultiplier = GetAgeMultiplier(faction == Faction::PLAYER ? currentAge : enemyAge);
+    float upgradeMultiplier = 1.0f;
+    if (faction == Faction::PLAYER) {
+        if (type == UnitType::WARRIOR) upgradeMultiplier = 1.0f + (warriorLvl - 1) * 0.3f;
+        else if (type == UnitType::ARCHER) upgradeMultiplier = 1.0f + (archerLvl - 1) * 0.3f;
+        else if (type == UnitType::TANK) upgradeMultiplier = 1.0f + (tankLvl - 1) * 0.3f;
+    }
 
     std::shared_ptr<Unit> newUnit = nullptr;
     if (type == UnitType::WARRIOR) {
         newUnit = std::make_shared<Warrior>(spawnX, spawnY, faction, warriorTex);
     } else if (type == UnitType::ARCHER) {
         newUnit = std::make_shared<Archer>(spawnX, spawnY, faction, archerTex);
-    } else if (type == UnitType::TANK) {
+    } else if (type == UnitType::TANK || type == UnitType::BOSS) {
         newUnit = std::make_shared<Tank>(spawnX, spawnY, faction, tankTex);
     }
 
     if (newUnit != nullptr) {
-        newUnit->ScaleStats(multiplier);
+        newUnit->ScaleStats(ageMultiplier, upgradeMultiplier);
+        
+        if (type == UnitType::BOSS) {
+            newUnit->SetBoss();
+            newUnit->ScaleStats(1.0f, 3.0f + enemyAI.currentWave * 0.5f); // Scale boss by wave
+        }
 
         if (faction == Faction::PLAYER) {
             if (playerGold >= newUnit->GetCost()) {
@@ -115,6 +149,7 @@ void Game::CastSpecialAttack(Faction caster) {
 
         playerExp -= METEOR_EXP_COST; // Trừ EXP người chơi
         specialCooldown = MAX_SPECIAL_COOLDOWN;
+        PlaySound(sfxWhoosh);
 
         for (int i = 0; i < 15; i++) {
             meteors.push_back({
@@ -169,19 +204,24 @@ void Game::EvolveAge(Faction faction) {
             playerExp -= expRequirement;
             expRequirement = 1200.0f; // Mốc thời Trung Cổ
 
-            btnWarrior.SetText("Knight ($90)");
-            btnArcher.SetText("Crossbow ($135)");
-            btnTank.SetText("Catapult ($270)");
-            btnEvolve.SetText("EVOLVE (1200 XP)");
+            btnWarrior.SetText("Hiep si ($90)");
+            btnArcher.SetText("No thu ($135)");
+            btnTank.SetText("May ban da ($270)");
+            btnEvolve.SetText("TIEN HOA (1200 KN)");
         } else if (currentAge == Age::MEDIEVAL_AGE) {
             currentAge = Age::MODERN_AGE;
             playerExp -= expRequirement;
             expRequirement = 1500.0f; // Giới hạn trần tối đa của Thời Hiện Đại
 
-            btnWarrior.SetText("Soldier ($160)");
-            btnArcher.SetText("Sniper ($240)");
-            btnTank.SetText("Battle Tank ($480)");
-            btnEvolve.SetText("MAX AGE");
+            btnWarrior.SetText("Linh bo binh ($160)");
+            btnArcher.SetText("Linh tia ($240)");
+            btnTank.SetText("Xe tang chien dau ($480)");
+            btnEvolve.SetText("TOI DA");
+            
+            if (!achievementAgeIII) {
+                achievementAgeIII = true;
+                ShowAchievement("THANH TUU: Dat Thoi Ky Hien Dai! (+300 Vang)");
+            }
         }
     } else {
         // AI Evolve
@@ -203,6 +243,10 @@ void Game::Update() {
     }
 
     float deltaTime = GetFrameTime();
+    
+    if (achievementPopupTimer > 0.0f) {
+        achievementPopupTimer -= deltaTime;
+    }
 
     // 1. Tự động tăng Vàng & EXP (Chỉ tăng EXP nếu chưa đạt MAX)
     playerGold += goldIncreaseRate * deltaTime;
@@ -243,6 +287,63 @@ void Game::Update() {
     if (btnWarrior.IsClicked() || IsKeyPressed(KEY_ONE))   SpawnUnit(Faction::PLAYER, UnitType::WARRIOR);
     if (btnArcher.IsClicked()  || IsKeyPressed(KEY_TWO))   SpawnUnit(Faction::PLAYER, UnitType::ARCHER);
     if (btnTank.IsClicked()    || IsKeyPressed(KEY_THREE)) SpawnUnit(Faction::PLAYER, UnitType::TANK);
+    
+    int costUpgWarrior = 100 * warriorLvl;
+    if (btnUpgWarrior.IsClicked() && playerGold >= costUpgWarrior) {
+        playerGold -= costUpgWarrior;
+        warriorLvl++;
+        btnUpgWarrior.SetText(TextFormat("Nang cap CB ($%d)", 100 * warriorLvl));
+    }
+    int costUpgArcher = 150 * archerLvl;
+    if (btnUpgArcher.IsClicked() && playerGold >= costUpgArcher) {
+        playerGold -= costUpgArcher;
+        archerLvl++;
+        btnUpgArcher.SetText(TextFormat("Nang cap CT ($%d)", 150 * archerLvl));
+    }
+    int costUpgTank = 300 * tankLvl;
+    if (btnUpgTank.IsClicked() && playerGold >= costUpgTank) {
+        playerGold -= costUpgTank;
+        tankLvl++;
+        btnUpgTank.SetText(TextFormat("Nang cap XT ($%d)", 300 * tankLvl));
+    }
+    
+    if (btnAutoSpawn.IsClicked()) {
+        autoSpawnEnabled = !autoSpawnEnabled;
+        if (autoSpawnEnabled) {
+            btnAutoSpawn.SetText("Tu dong: BAT");
+            btnAutoSpawn.SetRect(Rectangle{845, 88, 145, 25});
+        } else {
+            btnAutoSpawn.SetText("Tu dong: TAT");
+            btnAutoSpawn.SetRect(Rectangle{845, 88, 145, 25});
+        }
+    }
+
+    if (btnHealWall.IsClicked() && playerGold >= 100) {
+        playerGold -= 100;
+        playerWall.maxHp += 500;
+        playerWall.hp = playerWall.maxHp;
+        playerWall.level++;
+        playerWall.active = true;
+    }
+
+    if (autoSpawnEnabled) {
+        autoSpawnTimer -= deltaTime;
+        if (autoSpawnTimer <= 0.0f) {
+            autoSpawnTimer = 1.0f; // Check every second
+            float mul = GetAgeMultiplier(currentAge);
+            int count = CountUnits(Faction::PLAYER);
+            if (count < 6) {
+                // Ưu tiên spawn lính theo thứ tự: Tank -> Archer -> Warrior tuỳ vào tiền
+                if (playerGold >= (int)(150 * mul)) {
+                    SpawnUnit(Faction::PLAYER, UnitType::TANK);
+                } else if (playerGold >= (int)(75 * mul)) {
+                    SpawnUnit(Faction::PLAYER, UnitType::ARCHER);
+                } else if (playerGold >= (int)(50 * mul)) {
+                    SpawnUnit(Faction::PLAYER, UnitType::WARRIOR);
+                }
+            }
+        }
+    }
 
     // MUA EXP: Chỉ cho phép mua khi còn chỗ chứa (< expRequirement)
     bool canBuyExp = (playerGold >= BUY_EXP_GOLD_COST) && (playerExp < expRequirement);
@@ -265,7 +366,7 @@ void Game::Update() {
 
     // 6. Cập nhật các Unit
     for (auto& unit : activeUnits) {
-        unit->Update(deltaTime, activeUnits, playerBase, enemyBase);
+        unit->Update(deltaTime, activeUnits, playerBase, enemyBase, playerWall);
 
         if (unit->IsAttackingFrame()) {
             Vector2 origin = { unit->GetX(), 650.0f };
@@ -285,11 +386,17 @@ void Game::Update() {
     UpdateEffects(deltaTime);
     UpdateMeteors(deltaTime);
 
-    // 7. Nhận thưởng khi tiêu diệt lính (Cũng khóa trần không cho vượt quá Max)
+    // 7. Nhận thưởng khi tiêu diệt lính
     for (const auto& unit : activeUnits) {
         if (unit->IsDead()) {
             if (unit->GetFaction() == Faction::ENEMY) {
                 playerGold += unit->GetCost() * 0.8f;
+                totalKills++;
+                if (totalKills >= 100 && !achievement100Kills) {
+                    achievement100Kills = true;
+                    ShowAchievement("THANH TUU: Ha 100 Dich! (+300 Vang)");
+                }
+                
                 if (playerExp < expRequirement) {
                     playerExp += unit->GetExpReward();
                     if (playerExp > expRequirement) playerExp = expRequirement;
@@ -355,10 +462,10 @@ void Game::Update() {
         playerTurrets.emplace_back(playerSlots[playerTurrets.size()].x, playerSlots[playerTurrets.size()].y, Faction::PLAYER, tier);
 
         if (playerTurrets.size() >= 3) {
-            btnTurret.SetText("TURRETS MAX (3/3)");
+            btnTurret.SetText("TOI DA THAP (3/3)");
         } else {
             int nextCost = 120 + (int)playerTurrets.size() * 60;
-            btnTurret.SetText(TextFormat("Turret ($%d) [%d/3]", nextCost, (int)playerTurrets.size()));
+            btnTurret.SetText(TextFormat("Thap canh ($%d) [%d/3]", nextCost, (int)playerTurrets.size()));
         }
     }
 
@@ -396,6 +503,17 @@ void Game::Draw() {
         unit->Draw();
     }
 
+    // Vẽ Tường
+    if (playerWall.active) {
+        DrawRectangle(playerWall.x - 10, 480, 20, 170, DARKGRAY); // The wall
+        DrawRectangle(playerWall.x - 15, 470, 30, 10, GRAY);      // Wall top
+        
+        // Wall HP bar
+        float wallHpPercent = (float)playerWall.hp / playerWall.maxHp;
+        DrawRectangle(playerWall.x - 20, 450, 40, 6, DARKGRAY);
+        DrawRectangle(playerWall.x - 20, 450, 40 * wallHpPercent, 6, BLUE);
+    }
+
     // 4. Vẽ hiệu ứng đạn, kiếm, thiên thạch
     DrawEffects();
     
@@ -430,7 +548,7 @@ void Game::Draw() {
 
     // VÀNG (GOLD)
     DrawRectangleRounded({ 10, 8, 120, 30 }, 0.3f, 4, Color{ 30, 41, 59, 200 });
-    DrawText("GOLD:", 18, 17, 12, Color{ 203, 213, 225, 255 });
+    DrawText("VANG:", 18, 17, 12, Color{ 203, 213, 225, 255 });
     DrawText(TextFormat("%d", (int)playerGold), 62, 15, 16, Color{ 250, 204, 21, 255 });
 
     // QUÂN SỐ (UNITS)
@@ -439,12 +557,12 @@ void Game::Draw() {
         if (u->GetFaction() == Faction::PLAYER && !u->IsDead()) playerCount++;
     }
     DrawRectangleRounded({ 138, 8, 110, 30 }, 0.3f, 4, Color{ 30, 41, 59, 200 });
-    DrawText("UNITS:", 146, 17, 12, Color{ 203, 213, 225, 255 });
-    DrawText(TextFormat("%d/%d", playerCount, 6), 195, 15, 15, (playerCount >= 6 ? Color{ 239, 68, 68, 255 } : Color{ 56, 189, 248, 255 }));
+    DrawText("QUAN SO:", 146, 17, 12, Color{ 203, 213, 225, 255 });
+    DrawText(TextFormat("%d/%d", playerCount, 6), 205, 15, 15, (playerCount >= 6 ? Color{ 239, 68, 68, 255 } : Color{ 56, 189, 248, 255 }));
 
     // KINH NGHIỆM (EXP BAR)
-    DrawRectangleRounded({ 256, 8, 240, 30 }, 0.3f, 4, Color{ 30, 41, 59, 200 });
-    DrawText("EXP:", 264, 17, 12, Color{ 203, 213, 225, 255 });
+    DrawRectangleRounded({ 266, 8, 240, 30 }, 0.3f, 4, Color{ 30, 41, 59, 200 });
+    DrawText("KN:", 274, 17, 12, Color{ 203, 213, 225, 255 });
     
     // Thanh tiến trình EXP
     float expPercent = (expRequirement > 0) ? (playerExp / expRequirement) : 1.0f;
@@ -456,8 +574,13 @@ void Game::Draw() {
 
     // THÔNG TIN AI (ĐỐI THỦ)
     DrawRectangleRounded({ 835, 8, 155, 30 }, 0.3f, 4, Color{ 30, 41, 59, 200 });
-    DrawText("ENEMY EXP:", 843, 17, 11, Color{ 148, 163, 184, 255 });
-    DrawText(TextFormat("%d", (int)enemyExp), 920, 16, 13, Color{ 248, 113, 113, 255 });
+    DrawText(TextFormat("DOT: %d", enemyAI.currentWave), 843, 17, 11, Color{ 148, 163, 184, 255 });
+    
+    if (enemyAI.waveTimer > 0) {
+        DrawText(TextFormat("Toi sau %ds", (int)enemyAI.waveTimer), 895, 16, 13, Color{ 56, 189, 248, 255 });
+    } else {
+        DrawText("DANG DANH", 895, 16, 13, Color{ 248, 113, 113, 255 });
+    }
 
     // ==========================================
     // 7. VẼ CÁC NÚT ĐIỀU KHIỂN (ACTION BUTTONS)
@@ -478,22 +601,68 @@ void Game::Draw() {
     btnBuyExp.Draw(playerGold >= 50 && playerExp < expRequirement);
     btnSpecial.Draw(playerExp >= 150.0f && specialCooldown <= 0.0f);
     btnEvolve.Draw(playerExp >= expRequirement && currentAge != Age::MODERN_AGE);
+    btnAutoSpawn.Draw(true);
+
+    // Vẽ Nút Upgrade
+    btnUpgWarrior.Draw(playerGold >= 100 * warriorLvl);
+    btnUpgArcher.Draw(playerGold >= 150 * archerLvl);
+    btnUpgTank.Draw(playerGold >= 300 * tankLvl);
+    
+    btnHealWall.SetRect(Rectangle{410, 88, 135, 22});
+    btnHealWall.Draw(playerGold >= 100);
+
+    // VẼ TOOLTIP CHỈ SỐ LÍNH
+    if (btnWarrior.IsHovered() || btnArcher.IsHovered() || btnTank.IsHovered()) {
+        float ageMul = GetAgeMultiplier(currentAge);
+        int hp = 100, dmg = 15;
+        float atkSpeed = 1.2f;
+        float upgMul = 1.0f;
+        
+        if (btnWarrior.IsHovered()) upgMul = 1.0f + (warriorLvl - 1) * 0.3f;
+        else if (btnArcher.IsHovered()) {
+            hp = 80; dmg = 25; atkSpeed = 1.0f;
+            upgMul = 1.0f + (archerLvl - 1) * 0.3f;
+        } else if (btnTank.IsHovered()) {
+            hp = 300; dmg = 40; atkSpeed = 1.2f;
+            upgMul = 1.0f + (tankLvl - 1) * 0.3f;
+        }
+        
+        const char* tooltip = TextFormat("Mau: %d | ST: %d | Toc Danh: %.1fs", (int)(hp * ageMul * upgMul), (int)(dmg * ageMul * upgMul), atkSpeed);
+        int tooltipWidth = MeasureText(tooltip, 12) + 20;
+        DrawRectangle(10, 115, tooltipWidth, 24, Fade(BLACK, 0.85f));
+        DrawRectangleLines(10, 115, tooltipWidth, 24, RAYWHITE);
+        DrawText(tooltip, 20, 121, 12, RAYWHITE);
+    }
 
     // ==========================================
     // 8. MÀN HÌNH KẾT THÚC GAME
     // ==========================================
+    if (achievementPopupTimer > 0.0f) {
+        DrawRectangle(350, 150, 300, 50, ColorAlpha(GOLD, 0.8f));
+        DrawRectangleLines(350, 150, 300, 50, ORANGE);
+        DrawText(achievementText.c_str(), 360, 165, 14, BLACK);
+    }
+
     if (currentState == GameState::GAME_OVER) {
         DrawRectangle(0, 0, 1000, 800, Color{ 0, 0, 0, 200 });
         if (winner == 1) {
-            DrawText("VICTORY!", 380, 260, 50, Color{ 34, 197, 94, 255 });
+            DrawText("CHIEN THANG!", 380, 260, 50, Color{ 34, 197, 94, 255 });
         } else {
-            DrawText("DEFEAT!", 400, 260, 50, Color{ 239, 68, 68, 255 });
+            DrawText("THAT BAI!", 400, 260, 50, Color{ 239, 68, 68, 255 });
         }
         btnRestart.Draw(true);
     }
 
 }
+
+void Game::ShowAchievement(std::string text) {
+    achievementText = text;
+    achievementPopupTimer = 4.0f;
+    playerGold += 300;
+}
+
 void Game::AddEffect(EffectType type, Vector2 pos, Vector2 target, Faction f) {
+    if (type == EffectType::SLASH) PlaySound(sfxClash);
     float duration = (type == EffectType::SLASH) ? 0.2f : 0.35f;
     visualEffects.push_back({ pos, target, type, duration, duration, f });
 }

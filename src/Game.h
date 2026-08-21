@@ -20,6 +20,15 @@ enum class Age {
     MEDIEVAL_AGE = 1,
     MODERN_AGE = 2
 }; 
+
+struct Wall {
+    float x;
+    int hp;
+    int maxHp;
+    int level;
+    bool active;
+};
+
 struct Meteor {
     Vector2 position;
     float speed;
@@ -56,6 +65,7 @@ private:
     
     Base playerBase;
     Base enemyBase;
+    Wall playerWall;
 
     
     std::vector<Turret> playerTurrets;
@@ -74,6 +84,19 @@ private:
     Button btnSpecial;
     Button btnEvolve;     
     Button btnRestart;
+    Button btnAutoSpawn;
+    
+    Button btnUpgWarrior;
+    Button btnUpgArcher;
+    Button btnUpgTank;
+    Button btnHealWall;
+
+    int warriorLvl = 1;
+    int archerLvl = 1;
+    int tankLvl = 1;
+
+    bool autoSpawnEnabled = false;
+    float autoSpawnTimer = 0.0f;
 
     float specialCooldown;
     const float MAX_SPECIAL_COOLDOWN = 30.0f;
@@ -89,8 +112,18 @@ private:
 
     std::vector<VisualEffect> visualEffects;
 
+    Sound sfxClash;
+    Sound sfxWhoosh;
+
     GameState currentState;
     int winner;
+    int totalKills = 0;
+    bool achievement100Kills = false;
+    bool achievementAgeIII = false;
+    float achievementPopupTimer = 0.0f;
+    std::string achievementText;
+
+    void ShowAchievement(std::string text);
     void EvolveAge(Faction faction);
     int CountUnits(Faction faction) const;
     float GetAgeMultiplier(Age age) const;

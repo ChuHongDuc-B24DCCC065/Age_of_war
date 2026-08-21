@@ -3,43 +3,59 @@
 
 EnemyAI::EnemyAI() {
     gold = 100.0f;
-    goldRate = 15.0f; // Ngang bằng với người chơi
-    nextSpawnDelay = 2.0f; // Vừa vào game, địch sẽ chờ 2 giây mới đánh
+    goldRate = 15.0f; 
+    currentWave = 1;
+    unitsToSpawnThisWave = 3;
+    waveTimer = 15.0f; 
+    timeBetweenWaves = 30.0f;
+    nextSpawnDelay = 0.0f;
+    isBossWave = false;
 }
 
 void EnemyAI::Update(float deltaTime) {
     gold += goldRate * deltaTime;
     
-    if (nextSpawnDelay > 0) {
+    if (waveTimer > 0) {
+        waveTimer -= deltaTime;
+    } else if (nextSpawnDelay > 0) {
         nextSpawnDelay -= deltaTime;
     }
 }
 
 bool EnemyAI::DecideSpawn(UnitType& outType) {
-    // Đang trong thời gian chờ -> Không đẻ lính
+    if (waveTimer > 0) return false;
     if (nextSpawnDelay > 0) return false;
 
-    // Tung xúc xắc chọn ngẫu nhiên: 0(Warrior), 1(Archer), 2(Tank)
-    int choice = GetRandomValue(0, 2);
-    
-    int requiredGold = 0;
-    if (choice == 0) requiredGold = 50;
-    else if (choice == 1) requiredGold = 75;
-    else if (choice == 2) requiredGold = 150;
+    if (unitsToSpawnThisWave <= 0 && !isBossWave) {
+        isBossWave = true;
+        nextSpawnDelay = 3.0f;
+        return false;
+    }
 
-    // Nếu đủ tiền thì mới quyết định mua
-    if (gold >= requiredGold) {
-        if (choice == 0) outType = UnitType::WARRIOR;
-        else if (choice == 1) outType = UnitType::ARCHER;
-        else if (choice == 2) outType = UnitType::TANK;
+    if (isBossWave) {
+        outType = UnitType::BOSS;
         return true;
     }
 
-    return false; // Tiền chưa đủ -> Chờ thêm
+    int choice = GetRandomValue(0, 2);
+    if (choice == 0) outType = UnitType::WARRIOR;
+    else if (choice == 1) outType = UnitType::ARCHER;
+    else outType = UnitType::TANK;
+
+    return true;
 }
 
 void EnemyAI::OnUnitSpawned(int cost) {
-    gold -= cost; // Trừ tiền AI
-    // Reset thời gian chờ (Random từ 1.5s đến 4.0s) để lính không ra liên tục như súng liên thanh
-    nextSpawnDelay = (float)GetRandomValue(15, 40) / 10.0f; 
+    gold -= cost; 
+
+    if (isBossWave) {
+        isBossWave = false;
+        currentWave++;
+        unitsToSpawnThisWave = 3 + currentWave * 2;
+        waveTimer = timeBetweenWaves;
+        gold += 200; 
+    } else {
+        unitsToSpawnThisWave--;
+        nextSpawnDelay = (float)GetRandomValue(15, 35) / 10.0f; 
+    }
 }

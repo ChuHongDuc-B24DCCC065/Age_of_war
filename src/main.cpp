@@ -6,6 +6,7 @@ int main() {
     const int screenHeight = 800; // Giữ nguyên thông số 800 của bạn
 
     InitWindow(screenWidth, screenHeight, "Age of War");
+    InitAudioDevice();
     SetTargetFPS(60);
 
     // Tạo ra object game. Constructor của Game sẽ tự động tạo ra 2 nhà chính
@@ -19,6 +20,7 @@ int main() {
     EndDrawing();
     }
 
+    CloseAudioDevice();
     CloseWindow();
     return 0;
 }

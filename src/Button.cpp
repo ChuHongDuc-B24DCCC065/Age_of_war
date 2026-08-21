@@ -14,6 +14,12 @@ void Button::SetRect(Rectangle newRect) {
     rect = newRect;
 }
 
+bool Button::IsHovered() const {
+    if (!isEnabled) return false;
+    Vector2 mousePos = GetMousePosition();
+    return CheckCollisionPointRec(mousePos, rect);
+}
+
 bool Button::IsClicked() const {
     if (!isEnabled) return false;
     Vector2 mousePos = GetMousePosition();

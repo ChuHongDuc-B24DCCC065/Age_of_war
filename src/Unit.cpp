@@ -1,5 +1,6 @@
 #include "Unit.h"
 #include "Base.h"
+#include "Game.h"
 #include <cmath>
 #include <algorithm>
 Unit::Unit(float startX, float startY, Faction f, float statMultiplier) {
@@ -24,7 +25,7 @@ Unit::Unit(float startX, float startY, Faction f, float statMultiplier) {
     targetX = 0.0f;
 }
 
-void Unit::Update(float deltaTime, const std::vector<std::shared_ptr<Unit>>& units, Base& playerBase, Base& enemyBase) {
+void Unit::Update(float deltaTime, const std::vector<std::shared_ptr<Unit>>& units, Base& playerBase, Base& enemyBase, Wall& playerWall) {
     if (state == UnitState::DEAD) return;
 
     if (currentCooldown > 0.0f) {
@@ -67,11 +68,13 @@ void Unit::Update(float deltaTime, const std::vector<std::shared_ptr<Unit>>& uni
         }
     }
 
-    // 4. Khoảng cách tới nhà chính địch
+    // 4. Khoảng cách tới nhà chính địch hoặc tường
     float distToBase = (faction == Faction::PLAYER) ? (targetBase.GetX() - x) : (x - targetBase.GetX());
+    float distToWall = (faction == Faction::ENEMY && playerWall.active) ? (x - playerWall.x) : 99999.0f;
 
     // 5. Kiểm tra mục tiêu trong tầm đánh
     bool enemyInRange = (nearestEnemy != nullptr && minEnemyDist <= attackRange);
+    bool wallInRange  = (distToWall <= attackRange && distToWall > 0);
     bool baseInRange  = (distToBase <= attackRange);
 
     if (enemyInRange) {
@@ -84,6 +87,17 @@ void Unit::Update(float deltaTime, const std::vector<std::shared_ptr<Unit>>& uni
             targetX = nearestEnemy->GetX();
         }
     } 
+    else if (wallInRange) {
+        state = UnitState::ATTACKING;
+        if (currentCooldown <= 0.0f) {
+            playerWall.hp -= damage;
+            if (playerWall.hp <= 0) playerWall.active = false;
+            currentCooldown = 1.2f;
+
+            justAttacked = true;
+            targetX = playerWall.x;
+        }
+    }
     else if (baseInRange) {
         state = UnitState::ATTACKING;
         if (currentCooldown <= 0.0f) {
@@ -115,10 +129,7 @@ void Unit::Draw() {
     
     DrawRectangle(x, y - height, width, height, color);
 
-    // Thanh máu
-    float hpPercentage = (float)hp / maxHp;
-    DrawRectangle(x, y - height - 10, width, 5, RED);
-    DrawRectangle(x, y - height - 10, hpPercentage * width, 5, GREEN);
+
 
     // Hiệu ứng tấn công (VFX)
     if (state == UnitState::ATTACKING) {
@@ -155,16 +166,7 @@ void Unit::Draw() {
     DrawRectangle((int)barX, (int)barY, (int)(barWidth * hpPercent), (int)barHeight, (faction == Faction::PLAYER ? GREEN : RED));
     DrawRectangleLines((int)barX, (int)barY, (int)barWidth, (int)barHeight, BLACK);
 
-    // 3. HIỂN THỊ SỐ MÁU CỦA LÍNH
-    const char* hpText = TextFormat("%d/%d", hp, maxHp);
-    int fontSize = 10;
-    int textWidth = MeasureText(hpText, fontSize);
-    int textX = (int)(x - textWidth / 2.0f);
-    int textY = (int)(barY - 12.0f);
 
-    // Nền đen mờ phía sau số máu để không bị chìm vào nền trời
-    DrawRectangle(textX - 2, textY - 1, textWidth + 4, fontSize + 2, Fade(BLACK, 0.65f));
-    DrawText(hpText, textX, textY, fontSize, RAYWHITE);
 }
 
 void Unit::TakeDamage(int damageAmount) {
@@ -200,13 +202,5 @@ void Unit::DrawHealthBar() const {
     DrawRectangle((int)barX, (int)barY, (int)(barWidth * hpPercent), (int)barHeight, (faction == Faction::PLAYER ? GREEN : RED));
     DrawRectangleLines((int)barX, (int)barY, (int)barWidth, (int)barHeight, BLACK);
 
-    // 2. Vẽ số máu (Nằm ngay sát trên thanh máu 12px)
-    const char* hpText = TextFormat("%d/%d", hp, maxHp);
-    int fontSize = 10;
-    int textWidth = MeasureText(hpText, fontSize);
-    int textX = (int)(x - (textWidth / 2.0f));
-    int textY = (int)(barY - 12.0f);
 
-    DrawRectangle(textX - 2, textY - 1, textWidth + 4, fontSize + 2, Fade(BLACK, 0.75f));
-    DrawText(hpText, textX, textY, fontSize, RAYWHITE);
 }

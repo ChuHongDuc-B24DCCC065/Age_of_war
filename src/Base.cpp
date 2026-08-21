@@ -34,13 +34,5 @@ void Base::Draw() const {
     DrawRectangle((int)barX, (int)barY, (int)(barWidth * hpPercent), (int)barHeight, (isPlayer ? GREEN : RED));
     DrawRectangleLines((int)barX, (int)barY, (int)barWidth, (int)barHeight, BLACK);
 
-    // Số máu nhà
-    const char* hpText = TextFormat("%d / %d", hp, maxHp);
-    int fontSize = 12;
-    int textWidth = MeasureText(hpText, fontSize);
-    int textX = (int)(barX + (barWidth - textWidth) / 2.0f);
-    int textY = (int)(barY + (barHeight - fontSize) / 2.0f);
 
-    DrawText(hpText, textX + 1, textY + 1, fontSize, BLACK);
-    DrawText(hpText, textX, textY, fontSize, RAYWHITE);
 }
